@@ -733,6 +733,10 @@ float pspeedy(Points *points, float z, long *kcenter, int pid, pthread_barrier_t
     *kcenter = 1;
     costs = (double*)malloc(sizeof(double)*nproc);
   }
+
+#ifdef ENABLE_THREADS
+  pthread_barrier_wait(barrier);
+#endif
     
   if( pid != 0 ) { // we are not the master threads. we wait until a center is opened.
     while(1) {
