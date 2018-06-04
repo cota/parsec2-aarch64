@@ -18,6 +18,9 @@ along with this program; if not, write to the Free Software Foundation,
 Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 #include <stdio.h>
+#include <stdlib.h>
+#include <assert.h>
+#include <string.h>
 #include <math.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -57,10 +60,6 @@ int top_K = 10;
 
 char *extra_params = "-L 8 - T 20";
 
-int input_end, output_end;
-pthread_cond_t done;
-pthread_mutex_t done_mutex;
-
 cass_env_t *env;
 cass_table_t *table;
 cass_table_t *query_table;
@@ -73,10 +72,9 @@ struct load_data
 	int width, height;
 	char *name;
 	unsigned char *HSV, *RGB;
-	struct load_data *QUEUE_LINK;
 };
 
-QUEUE_HEAD(struct load_data) q_load_seg;
+struct queue q_load_seg;
 
 struct seg_data
 {
@@ -84,41 +82,35 @@ struct seg_data
 	char *name;
 	unsigned char *mask;
 	unsigned char *HSV;
-	struct seg_data *QUEUE_LINK;
 };
 
-QUEUE_HEAD(struct seg_data) q_seg_extract;
+struct queue q_seg_extract;
 
 struct extract_data
 {
 	cass_dataset_t ds;
 	char *name;
-	struct extract_data *QUEUE_LINK;
 };
 
-QUEUE_HEAD(struct extract_data) q_extract_vec;
+struct queue q_extract_vec;
 
 struct vec_query_data
 {
 	char *name;
 	cass_dataset_t *ds;
 	cass_result_t result;
-	struct vec_query_data *QUEUE_LINK;
 };
 
-QUEUE_HEAD(struct vec_query_data) q_vec_rank;
+struct queue q_vec_rank;
 
 struct rank_data
 {
 	char *name;
 	cass_dataset_t *ds;
 	cass_result_t result;
-	struct rank_data *QUEUE_LINK;
 };
 
-QUEUE_HEAD(struct rank_data) q_rank_out;
-
-
+struct queue q_rank_out;
 
 
 /* ------- The Helper Functions ------- */
@@ -172,8 +164,7 @@ int file_helper (const char *file)
 		*/
 
 	cnt_enqueue++;
-
-	queue_enqueue_wait(&q_load_seg, data);
+	enqueue(&q_load_seg, data);
 
 	return 0;
 }
@@ -229,9 +220,8 @@ void *t_load (void *dummy)
 		scan_dir(dir, path);
 	}
 
-	input_end = 1;
+	queue_signal_terminate(&q_load_seg);
 	return NULL;
-
 }
 
 void *t_seg (void *dummy)
@@ -239,9 +229,11 @@ void *t_seg (void *dummy)
 	struct seg_data *seg;
 	struct load_data *load;
 
-	for (;;)
+	while(1)
 	{
-		queue_dequeue_wait(&q_load_seg, &load);
+		if(dequeue(&q_load_seg, &load) < 0)
+		    break;
+		
 		assert(load != NULL);
 		seg = (struct seg_data *)calloc(1, sizeof(struct seg_data));
 
@@ -255,8 +247,10 @@ void *t_seg (void *dummy)
 		free(load->RGB);
 		free(load);
 
-		queue_enqueue_wait(&q_seg_extract, seg);
-	}		
+		enqueue(&q_seg_extract, seg);
+	}
+
+	queue_signal_terminate(&q_seg_extract);
 	return NULL;
 
 }
@@ -266,9 +260,11 @@ void *t_extract (void *dummy)
 	struct seg_data *seg;
 	struct extract_data *extract;
 
-	for (;;)
+	while (1)
 	{
-		queue_dequeue_wait(&q_seg_extract, &seg);
+		if(dequeue(&q_seg_extract, &seg) < 0)
+		    break;
+		
 		assert(seg != NULL);
 		extract = (struct extract_data *)calloc(1, sizeof(struct extract_data));
 
@@ -280,8 +276,10 @@ void *t_extract (void *dummy)
 		free(seg->HSV);
 		free(seg);
 
-		queue_enqueue_wait(&q_extract_vec, extract);
+		enqueue(&q_extract_vec, extract);
 	}
+
+	queue_signal_terminate(&q_extract_vec);
 	return NULL;
 }
 
@@ -290,9 +288,11 @@ void *t_vec (void *dummy)
 	struct extract_data *extract;
 	struct vec_query_data *vec;
 	cass_query_t query;
-	for (;;)
+	while(1)
 	{
-		queue_dequeue_wait(&q_extract_vec, &extract);
+		if(dequeue(&q_extract_vec, &extract) < 0)
+		    break;
+		
 		assert(extract != NULL);
 		vec = (struct vec_query_data *)calloc(1, sizeof(struct vec_query_data));
 		vec->name = extract->name;
@@ -317,8 +317,10 @@ void *t_vec (void *dummy)
 	//	cass_table_query(table, &query, &vec->result);
 		cass_table_query(table, &query, &vec->result);
 
-		queue_enqueue_wait(&q_vec_rank, vec);
+		enqueue(&q_vec_rank, vec);
 	}
+
+	queue_signal_terminate(&q_vec_rank);
 	return NULL;
 }
 
@@ -328,9 +330,11 @@ void *t_rank (void *dummy)
 	struct rank_data *rank;
 	cass_result_t *candidate;
 	cass_query_t query;
-	for (;;)
+	while (1)
 	{
-		queue_dequeue_wait(&q_vec_rank, &vec);
+		if(dequeue(&q_vec_rank, &vec) < 0)
+		    break;
+		
 		assert(vec != NULL);
 
 		rank = (struct rank_data *)calloc(1, sizeof(struct rank_data));
@@ -361,19 +365,22 @@ void *t_rank (void *dummy)
 		cass_dataset_release(vec->ds);
 		free(vec->ds);
 		free(vec);
-		queue_enqueue_wait(&q_rank_out, rank);
+		enqueue(&q_rank_out, rank);
 	}
+
+	queue_signal_terminate(&q_rank_out);
 	return NULL;
 }
 
 void *t_out (void *dummy)
 {
 	struct rank_data *rank;
-	for (;;)
+	while (1)
 	{
-		queue_dequeue_wait(&q_rank_out, &rank);
+		if(dequeue(&q_rank_out, &rank) < 0)
+		    break;
+		
 		assert(rank != NULL);
-
 
 		fprintf(fout, "%s", rank->name);
 
@@ -395,14 +402,9 @@ void *t_out (void *dummy)
 		cnt_dequeue++;
 		
 		fprintf(stderr, "(%d,%d)\n", cnt_enqueue, cnt_dequeue);
-		if (input_end && (cnt_enqueue == cnt_dequeue))
-		{
-			pthread_mutex_lock(&done_mutex);
-			output_end = 1;
-			pthread_cond_signal(&done);
-			pthread_mutex_unlock(&done_mutex);
-		}
 	}
+
+	assert(cnt_enqueue == cnt_dequeue);
 	return NULL;
 }
 
@@ -493,11 +495,11 @@ int main (int argc, char *argv[])
 	image_init(argv[0]);
 
 	stimer_tick(&tmr);
-	QUEUE_INIT_DEPTH(&q_load_seg, DEPTH);
-	QUEUE_INIT_DEPTH(&q_seg_extract, DEPTH);
-	QUEUE_INIT_DEPTH(&q_extract_vec, DEPTH);
-	QUEUE_INIT_DEPTH(&q_vec_rank, DEPTH);
-	QUEUE_INIT_DEPTH(&q_rank_out, DEPTH);
+	queue_init(&q_load_seg,    DEPTH, NTHREAD_LOAD);
+	queue_init(&q_seg_extract, DEPTH, NTHREAD_SEG);
+	queue_init(&q_extract_vec, DEPTH, NTHREAD_EXTRACT);
+	queue_init(&q_vec_rank,    DEPTH, NTHREAD_VEC);
+	queue_init(&q_rank_out,    DEPTH, NTHREAD_RANK);
 
 	t_load_desc = (tdesc_t *)calloc(NTHREAD_LOAD, sizeof(tdesc_t));
 	t_seg_desc = (tdesc_t *)calloc(NTHREAD_SEG, sizeof(tdesc_t));
@@ -540,10 +542,6 @@ int main (int argc, char *argv[])
 	t_out_desc[0].arg = NULL;
 	for (i = 1; i < NTHREAD_OUT; i++) t_out_desc[i] = t_out_desc[0];
 
-	pthread_cond_init(&done, NULL);
-	pthread_mutex_init(&done_mutex, NULL);
-
-	input_end = output_end = 0;
 	cnt_enqueue = cnt_dequeue = 0;
 
 #ifdef ENABLE_PARSEC_HOOKS
@@ -556,17 +554,12 @@ int main (int argc, char *argv[])
 	p_rank = tpool_create(t_rank_desc, NTHREAD_RANK);
 	p_out = tpool_create(t_out_desc, NTHREAD_OUT);
 
-
-	pthread_mutex_lock(&done_mutex);
-	if (!output_end) pthread_cond_wait(&done, &done_mutex);
-	tpool_cancel(p_load);
-	tpool_cancel(p_seg);
-	tpool_cancel(p_extract);
-	tpool_cancel(p_vec);
-	tpool_cancel(p_rank);
-	tpool_cancel(p_out);
-	pthread_mutex_unlock(&done_mutex);
-	pthread_mutex_destroy(&done_mutex);
+	tpool_join(p_out, NULL);
+	tpool_join(p_rank, NULL);
+	tpool_join(p_vec, NULL);
+	tpool_join(p_extract, NULL);
+	tpool_join(p_seg, NULL);
+	tpool_join(p_load, NULL);
 
 #ifdef ENABLE_PARSEC_HOOKS
 	__parsec_roi_end();
@@ -585,6 +578,12 @@ int main (int argc, char *argv[])
 	free(t_vec_desc);
 	free(t_rank_desc);
 	free(t_out_desc);
+
+	queue_destroy(&q_load_seg);
+	queue_destroy(&q_seg_extract);
+	queue_destroy(&q_extract_vec);
+	queue_destroy(&q_vec_rank);
+	queue_destroy(&q_rank_out);
 
 	stimer_tuck(&tmr, "QUERY TIME");
 
