@@ -768,12 +768,11 @@ SendBlock(void * targs)
   int fd = 0;
   struct hash_entry * entry; 
 
-  fd = open(conf->outfile, O_CREAT|O_TRUNC|O_WRONLY|O_TRUNC);
+  fd = open(conf->outfile, O_CREAT|O_TRUNC|O_WRONLY|O_TRUNC, S_IRGRP | S_IWUSR | S_IRUSR | S_IROTH);
   if (fd < 0) {
     perror("SendBlock open");
     return NULL;
   }
-  fchmod(fd, S_IRGRP | S_IWUSR | S_IRUSR | S_IROTH);
 
   send_buf_item * fetchbuf[ITEM_PER_FETCH];
   int fetch_count = 0, fetch_start = 0;

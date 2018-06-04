@@ -185,10 +185,9 @@ Reassemble(void * args) {
   list_head = NULL;
 
   if (args != NULL) {
-    fd = open((char *)args, O_CREAT|O_WRONLY|O_TRUNC);
+    fd = open((char *)args, O_CREAT|O_WRONLY|O_TRUNC, ~(S_ISUID | S_ISGID |S_IXGRP | S_IXUSR | S_IXOTH));
     if (fd < 0) 
       perror("Reassemble open");
-    fchmod(fd, ~(S_ISUID | S_ISGID |S_IXGRP | S_IXUSR | S_IXOTH));
   }
 
   while (1) {
@@ -255,7 +254,7 @@ Reassemble(void * args) {
       //get file header
       head = (send_head *)item->str;
       if (fd == -1) {
-        fd = open(head->filename, O_CREAT|O_WRONLY|O_TRUNC);
+        fd = open(head->filename, O_CREAT|O_WRONLY|O_TRUNC, ~(S_ISUID | S_ISGID |S_IXGRP | S_IXUSR | S_IXOTH));
         if (fd < 0)
           perror("head_open");
       }
