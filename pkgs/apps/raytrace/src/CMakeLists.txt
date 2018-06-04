@@ -151,7 +151,7 @@ SUBDIRS(
 	)
 
 ADD_EXECUTABLE(test_glut Testing/testglut)
-TARGET_LINK_LIBRARIES(test_glut ${GLUT_glut_LIBRARY} ${GL_LIBS} $ENV{LIBS})
+TARGET_LINK_LIBRARIES(test_glut ${GLUT_glut_LIBRARY} ${GL_LIBS} $ENV{LIBS} -lXext)
 
 #ADD_EXECUTABLE(test_pbo Testing/testpbo)
 #TARGET_LINK_LIBRARIES(test_pbo ${GLUT_glut_LIBRARY} ${GL_LIBS} $ENV{LIBS} stdc++)
