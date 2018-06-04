@@ -24,6 +24,7 @@
 #define ACCESS_FILE _access
 #define COMPPARE_STRINGS_IGNORE_CASE stricmp
 #else
+#include <unistd.h>
 #define ACCESS_FILE access
 #define COMPPARE_STRINGS_IGNORE_CASE strcasecmp
 #endif
