@@ -1,0 +1,5 @@
+#!/bin/bash
+
+# gcc-aarch64-hooks.bldconf - configuration file for PARSEC
+
+source ${PARSECDIR}/pkgs/libs/imagick/parsec/gcc-aarch64.bldconf

@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# gcc-aarch64-hooks.bldconf - configuration file for PARSEC
+
+source ${PARSECDIR}/pkgs/apps/x264/parsec/gcc-aarch64.bldconf
+build_deps="hooks ${build_deps}"

@@ -1,0 +1,7 @@
+#!/bin/bash
+
+# gcc-aarch64-hooks.bldconf - configuration file for PARSEC
+
+source ${PARSECDIR}/pkgs/apps/vips/parsec/gcc-aarch64.bldconf
+# Package dependencies
+build_deps="hooks glib libxml2 zlib"

@@ -1,0 +1,5 @@
+#!/bin/bash
+
+# gcc-aarch64-hooks.bldconf - configuration file for PARSEC
+
+source ${PARSECDIR}/pkgs/libs/mesa/parsec/gcc-aarch64.bldconf
