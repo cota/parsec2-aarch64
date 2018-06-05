@@ -69,7 +69,7 @@ LTCOMPILE = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 CCLD = $(CC)
 LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
-	$(LDFLAGS) -o $@
+	$(LDFLAGS) -all-static -o $@
 SOURCES = $(libiofuncs_la_SOURCES)
 DIST_SOURCES = $(libiofuncs_la_SOURCES)
 ETAGS = etags
