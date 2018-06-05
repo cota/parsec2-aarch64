@@ -1,0 +1,7 @@
+inst/
+obj/
+run/
+/log/*
+*.runconf
+*.tar
+run/
