@@ -71,7 +71,7 @@
  * This functionality is enabled by default on Linux systems.
  */
 //NOTE: Requires sched_setaffinity() (Linux only)
-#define ENABLE_SETAFFINITY 1
+#define ENABLE_SETAFFINITY 0
 /** \brief Name of environment variable to control number of CPUs.
  *
  * This macro defines the name of one of the two environment variables which
