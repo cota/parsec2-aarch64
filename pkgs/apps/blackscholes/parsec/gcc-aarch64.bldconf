@@ -8,8 +8,10 @@
 # global configuration. All variables set in the global configuration files can
 # be referenced here.
 
+build_deps=""
+
 # Environment to use for configure script and Makefile
-build_env=""
+build_env="version=pthreads"
 
 # Whether the build system supports only in-place compilation
 # If TRUE, then all sources will be copied to the build directory before we
